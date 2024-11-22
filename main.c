@@ -37,11 +37,11 @@ int main(void)
 
         // Move player 
         if (IsKeyDown(KEY_RIGHT)) playerPos.x += playerSpeed;
-        else if (IsKeyDown(KEY_LEFT)) playerPos.x -= playerSpeed;
-        else if (IsKeyDown(KEY_DOWN)) playerPos.z += playerSpeed;
-        else if (IsKeyDown(KEY_UP)) playerPos.z -= playerSpeed;
-        else if (IsKeyDown(KEY_COMMA)) playerPos.y += playerSpeed;
-        else if (IsKeyDown(KEY_PERIOD)) playerPos.y -= playerSpeed;
+        if (IsKeyDown(KEY_LEFT)) playerPos.x -= playerSpeed;
+        if (IsKeyDown(KEY_DOWN)) playerPos.z += playerSpeed;
+        if (IsKeyDown(KEY_UP)) playerPos.z -= playerSpeed;
+        if (IsKeyDown(KEY_COMMA)) playerPos.y += playerSpeed;
+        if (IsKeyDown(KEY_PERIOD)) playerPos.y -= playerSpeed;
         // else if (IsKeyPressed(KEY_SPACE)) PlaySound(sound);
 
         collision = false;
