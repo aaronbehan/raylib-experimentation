@@ -1,1 +1,1 @@
-This is something I plan to use to eventually have dynamically implemented music in games. 
+This is how I plan to eventually have dynamically implemented music in games. 
