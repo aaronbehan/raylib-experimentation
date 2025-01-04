@@ -1,1 +1,2 @@
-This is how I plan to eventually have dynamically implemented music in games. 
+Through having a universal ticker, my idea is to have dynamically implemented, layered music in games. 
+I can also think about ways to free aspects of the program from their dependency upon FPS which is highly variable. For example, character properties such as walk speed and attack rate should not be linked to FPS, but to a more constant and predictable value. For now, I have chosen BPM (beats per minute) which can be an easy transition to music theory, allowing this primitive time keeping mechanic to have multiple uses in the future.
