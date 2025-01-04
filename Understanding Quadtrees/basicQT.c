@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include "raylib.h"
 
 typedef struct Boundary {
     float x;
@@ -8,7 +9,7 @@ typedef struct Boundary {
 } Boundary;
 
 typedef struct Point {
-    float x, y;
+    float x, z;
 } Point;
 
 typedef struct QuadtreeNode {
@@ -53,8 +54,8 @@ QuadtreeNode* createQuadtreeNode(Boundary boundary, int capacity) {
 int containsPoint(Boundary boundary, Point p) {
     return (p.x >= boundary.x - boundary.halfWidth &&  // checks that p.x is greater than boundary.min.x
             p.x <= boundary.x + boundary.halfWidth &&  // checks that p.x is smaller than boundary.max.x
-            p.y >= boundary.y - boundary.halfWidth &&  // checks that p.y is greater than boundary.min.y
-            p.y <= boundary.y + boundary.halfWidth);   // checks that p.y is smaller than boundary.max.y
+            p.z >= boundary.y - boundary.halfWidth &&  // checks that p.z is greater than boundary.min.y
+            p.z <= boundary.y + boundary.halfWidth);   // checks that p.z is smaller than boundary.max.y
 }  // if every single condition here is met then that means that p is INSIDE boundary
 
 
@@ -115,30 +116,77 @@ void freeQuadtree(QuadtreeNode* node) {
     free(node);
 }
 
-// ^------------------------------- FUNCTIONS ------------------------------------------------------------------------------
+// ^------------------------------- FUNCTIONS --------------------------------------------------^
 
 
 
 int main() 
 {
-    //                                 x    y    halfwdth
-    Boundary boundary = createBoundary(0.0, 0.0, 10.0); // Create a boundary of 20x20
-    QuadtreeNode* root = createQuadtreeNode(boundary, 4); // Root node with capacity of 4 Points
+    // Initialization
+    const int screenWidth = 1600;
+    const int screenHeight = 900;
 
-    // Insert points. Each of these points will be mutable, either through player commands or AI. Each iteration through the game loop, we insert every one of them back into the tree, rebuilding it again and again and again to account for the changes made by the player and by the AI
+    InitWindow(screenWidth, screenHeight, "raylib quadtree");
+
+    Camera camera = { { 0.0f, 10.0f, 10.0f }, { 0.0f, 0.0f, 0.0f }, { 0.0f, 1.0f, 0.0f }, 45.0f, 0 };
+    float cameraSpeed = 0.5;
+
+
+    Vector3 quadtreePos = { 0.0f, 1.0f, 0.0f };
+    Vector3 quadtreeSize = { 20.0f, 2.0f, 20.0f };
+    Vector3 pointSize = {0.05f, 1.0f, 0.05f};
+
     Point points[] = {{-5, -5}, {5, 5}, {3, 3}, {-2, -2}, {7, 7}, {8, 8}};
-    for (int i = 0; i < 6; i++) {        
-        if (insert(root, points[i])) // we put in a pointer to a QuadtreeNode and a Point(on the graph)
-        {
-            printf("Inserted point (%.1f, %.1f)\n", points[i].x, points[i].y);
-        }
-        else // unless the coordinates fall outside of largest parent boundary, this should never trigger
-        {
-            printf("Failed to insert point (%.1f, %.1f)\n", points[i].x, points[i].y);
-        }
+
+    SetTargetFPS(60);               // Set our game to run at 60 frames-per-second
+
+    // Main game loop
+    while (!WindowShouldClose())    // Detect window close button or ESC key
+    {
+        // Camera controls
+        if (IsKeyDown(KEY_W)) camera.position.z -= cameraSpeed, camera.target.z -= cameraSpeed;
+        if (IsKeyDown(KEY_A)) camera.position.x -= cameraSpeed, camera.target.x -= cameraSpeed;
+        if (IsKeyDown(KEY_S)) camera.position.z += cameraSpeed, camera.target.z += cameraSpeed;
+        if (IsKeyDown(KEY_D)) camera.position.x += cameraSpeed, camera.target.x += cameraSpeed;
+        camera.position.y -= (GetMouseWheelMove()*cameraSpeed);  // CAMERA UP
+        camera.target.y -= (GetMouseWheelMove()*cameraSpeed);  
+
+        BeginDrawing();
+
+            ClearBackground(RAYWHITE);
+
+            BeginMode3D(camera);
+                //                                 x    y    halfwdth
+                Boundary boundary = createBoundary(0.0, 0.0, 10.0); // Create a boundary of 20x20
+                QuadtreeNode* root = createQuadtreeNode(boundary, 4); // Root node with capacity of 4 Points
+
+                // Insert points. Each of these points are mutable, either through player commands or AI. Each iteration through the game loop, we insert every one of them back into the tree, rebuilding it again and again and again to account for the changes made by the player and by the AI
+                for (int i = 0; i < 6; i++) {        
+                    if (insert(root, points[i])) // we put in a pointer to a QuadtreeNode and a Point(on the graph)
+                    {
+                        DrawCube((Vector3){points[i].x, 0.5, points[i].z}, pointSize.x, pointSize.y, pointSize.z, RED);
+                    }
+                    else // unless the coordinates fall outside of largest parent boundary, this should never trigger
+                    {
+                    
+                    }
+                }
+
+                DrawCubeWires(quadtreePos, quadtreeSize.x, quadtreeSize.y, quadtreeSize.z, DARKGRAY);
+
+                DrawGrid(20, 1.0f);   // Draw a grid
+
+            EndMode3D();
+
+            DrawFPS(10, 10);
+
+        EndDrawing();
+
+        // Free memory
+        freeQuadtree(root);
     }
 
-    // Free memory
-    freeQuadtree(root);
+    CloseWindow();        // Close window and OpenGL context
+
     return 0;
 }
