@@ -1,6 +1,9 @@
 #include "raylib.h"
 #include "structs.h"
-#include <stdlib.h>
+#include "timer.h"
+#include <stdlib.h>  // for memory allocation
+
+#define BEATS_PER_MINUTE 60
 
 Unit CreateEnemyUnit(void) 
 {
@@ -25,11 +28,11 @@ int main(void)
 
     Camera camera = { { 0.0f, 10.0f, 10.0f }, { 0.0f, 0.0f, 0.0f }, { 0.0f, 1.0f, 0.0f }, 45.0f, 0 };
 
-    Unit playerUnit = { { 0.0f, 1.0f, 0.0f }, { 0 }, { 1.0f, 2.0f, 1.0f }, { 0 }, 0.05f, 40, 40, 3, 1, false, false, false, RED};
-    Vector3 attackBox = { 0 };
+    Unit playerUnit = { { 0.0f, 1.0f, 0.0f }, { 0 }, { 1.0f, 2.0f, 1.0f }, { 0 }, 0.05f, 0.5f, 40, 40, 6, false, false, false, 0, RED};
+    Vector3 attackBox = { 0.0f, 10, 0.0f };
     Vector3 attackBoxSize = { 0.5f, 0.5f, 0.5f };
 
-    // This will be highly variable, hence the need for the heap instead of fixed arrays. 
+    // Number of enemies will be highly variable, hence the need for the heap instead of fixed arrays. 
     int numberOfEnemies = 4;  // KEEP THIS UPDATED
 
     Unit *enemies = (Unit*)malloc(numberOfEnemies * sizeof(Unit));  // could it be friendlier to lower RAM machines to use pointers to Units here instead of actual Units here? update: reddit consensus is that it makes no difference
@@ -43,7 +46,8 @@ int main(void)
 
     // Main game loop
     while (!WindowShouldClose())        // Detect window close button or ESC key
-    {
+    {   
+        // Player controls
         if (IsKeyDown(KEY_RIGHT)) playerUnit.unitPos.x += 0.1;
         if (IsKeyDown(KEY_LEFT)) playerUnit.unitPos.x -= 0.1;
         if (IsKeyDown(KEY_DOWN)) playerUnit.unitPos.z += 0.1;
@@ -51,9 +55,20 @@ int main(void)
 
         if (IsKeyDown(KEY_SPACE)) // attacking prototype 
         {
-            attackBox.x = playerUnit.unitPos.x;
-            attackBox.y = playerUnit.unitPos.y;
-            attackBox.z = playerUnit.unitPos.z + 1;  // only one direction attack so far
+            if (TimerDone(&playerUnit.ticker)) 
+            {
+                StartTimer(&playerUnit.ticker, playerUnit.attackRate);
+                attackBox.x = playerUnit.unitPos.x + 1;
+                attackBox.y = playerUnit.unitPos.y;
+                attackBox.z = playerUnit.unitPos.z;
+            }
+            else 
+            {
+                attackBox.x = 0.0f;
+                attackBox.y = 10.0f;
+                attackBox.z = 0.0f;
+            }
+            UpdateTimer(&playerUnit.ticker);
         }
         if (IsKeyReleased(KEY_SPACE)) 
         {
@@ -81,7 +96,7 @@ int main(void)
                                         enemies[i].unitPos.y + enemies[i].unitSize.y/2,
                                         enemies[i].unitPos.z + enemies[i].unitSize.z/2 }})) 
                     {
-                        enemies[i].currentHealth -= 1;
+                        enemies[i].currentHealth -= playerUnit.attackValue;
                         if (enemies[i].currentHealth <= 0) enemies[i].dead = true;
                     }
             }
