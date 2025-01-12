@@ -17,4 +17,25 @@ BoundingBox createBoundingBox(Vector3 startPoint, Vector3 endPoint) // Creates a
     return boundingBox;
 }
 
+Unit InitialiseUnit(void)  // random coords at the moment 
+{
+    Unit unit = { 0 };
+
+    unit.size = (Vector3){1.0f, 2.0f, 1.0f};
+    unit.position = (Vector3){GetRandomValue(-5, 5), unit.size.y/2, GetRandomValue(-5, 5)};  // Unit overlap currently possible
+    unit.waypoint = (Vector3){unit.position.x, unit.position.y, unit.position.z};
+    // Screen position correctly set to 0, 0
+    unit.speed = 0.05;
+    unit.attackRate = 0.75;
+    unit.maxHealth = 50;
+    unit.currentHealth = unit.maxHealth;
+    unit.attackValue = 2;
+    // Selected correctly set to 0
+    // Targeting correctly??? set to 0. Would have liked NULL but having difficulties with defining it in this separate file
+    // Ticker correctly set to 0
+    unit.colour = PURPLE;
+
+    return unit;
+}
+
 #endif
