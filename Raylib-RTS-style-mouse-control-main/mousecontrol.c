@@ -2,11 +2,13 @@
 #include "structs.h"
 #include "functions.h"
 #include "timer.h"
+#include <stddef.h>  // FOR NULL DEFINITION
 
 #define FLT_MAX     340282346638528859811704183484516925440.0f  // Maximum value of a float, from bit pattern 01111111011111111111111111111111. Necessary for ground detection, but cannot discern why yet
+#define NUMBER_OF_PLAYER_UNITS 2  // VERY IMPORTANT TO KEEP THIS UPDATED. i suppose if you want to do something like take control of enemies then this approach should be revised
+#define NUMBER_OF_ENEMY_UNITS 2
 
 // upon right click w enemy and eventual collission w enemy, enemy.targeted.true unless right clicked away
-// 
 
 int main(void)
 {
@@ -29,25 +31,20 @@ int main(void)
     RayCollision objectCollision = { 0 };  // For casting a ray at an OBJECT. Stores collision hit info
     RayCollision groundCollision = { 0 };  // For casting a ray at the GROUND in order to return 3D coordinates 
 
-    // Timer related
-    Timer timer = { 0 };
-    float duration = 1.0f;  // roughly 1 second 
-    int ticker = 0;  
-
-    #define NUMBER_OF_PLAYER_UNITS 1  // VERY IMPORTANT TO KEEP THIS UPDATED
-
     // Player controlled units
-    Unit playerUnit1 = { { 0.0f, 1.0f, -4.0f }, { 0.0f, 1.0f, -4.0f }, { 1.0f, 2.0f, 1.0f }, 0.05f, 10, 3, 1, false, false, false, GRAY}; 
+    Unit playerUnit1 = { { 0.0f, 1.0f, -2.0f }, { 0 }, { 1.0f, 2.0f, 1.0f }, { 0 }, 0.05f, 0.5f, 40, 40, 6, false, 0, false, 0, RED};
+    Unit playerUnit2 = { { 5.0f, 1.0f, 0.0f }, { 5.0f, 1.0f, 0.0f }, { 1.0f, 2.0f, 1.0f }, { 0 }, 0.05f, 0.5f, 40, 40, 6, false, 0, false, 0, ORANGE};
     // Unit playerUnit2 = { { 4.0f, 1.0f, 3.0f }, { 4.0f, 1.0f, 3.0f }, { 1.0f, 2.0f, 1.0f }, 0.01f, false, false, ORANGE}; 
 
-    Unit playerUnits[NUMBER_OF_PLAYER_UNITS] = {playerUnit1};
+    Unit playerUnits[NUMBER_OF_PLAYER_UNITS] = {playerUnit1, playerUnit2};
 
     // Enemies
-    Unit enemyUnit1 = { { -3.0f, 1.0f, 5.0f }, { 0.0f, 1.0f, -4.0f }, { 1.0f, 2.0f, 1.0f }, 0.05f, 10, 3, 1, false, false, false, PURPLE};
+    Unit enemyUnit1 =  { { -3.0f, 1.0f, 0.0f }, { 0 }, { 1.0f, 2.0f, 1.0f }, { 0 }, 0.05f, 0.5f, 40, 40, 1, false, 0, false, 0, PURPLE};
+    Unit enemyUnit2 =  { { 3.0f, 1.0f, -4.0f }, { 0 }, { 1.0f, 2.0f, 1.0f }, { 0 }, 0.05f, 0.5f, 40, 40, 1, false, 0, false, 0, BLUE};
 
-    Unit enemyUnits[NUMBER_OF_PLAYER_UNITS] = {enemyUnit1};
+    Unit enemyUnits[NUMBER_OF_ENEMY_UNITS] = {enemyUnit1, enemyUnit2};
 
-    // For drawing a visual aid rectangle with the mouse
+    // For drawing a visual aid rectangle with the mouse when selecting screen elements
     Vector2 saveMousePos2D = { 0 };
     // For drawing a bounding box in 3D space behind the above rectangle
     Vector3 save3DMouseStartPos = { 0 };
@@ -60,9 +57,6 @@ int main(void)
     // Main game loop -------------------------------------------------------------------------------
     while (!WindowShouldClose())
     {
-        UpdateTimer(&timer);  // With every cycle, timer->Lifetime is deducted by GetFrameTime as long as it is greater than 0
-        if (TimerDone(&timer)) StartTimer(&timer, duration), ticker++;
-
         // Camera controls
         if (IsKeyDown(KEY_W)) camera.position.z -= cameraSpeed, camera.target.z -= cameraSpeed;
         if (IsKeyDown(KEY_A)) camera.position.x -= cameraSpeed, camera.target.x -= cameraSpeed;
@@ -71,6 +65,11 @@ int main(void)
         camera.position.y -= (GetMouseWheelMove()*cameraSpeed);  // CAMERA UP
         camera.target.y -= (GetMouseWheelMove()*cameraSpeed);  
         camera.position.z -= (GetMouseWheelMove()*0.6);
+
+        if (IsKeyDown(KEY_RIGHT)) enemyUnits[0].unitPos.x += 0.1f;
+        if (IsKeyDown(KEY_LEFT)) enemyUnits[0].unitPos.x -= 0.1f;
+        if (IsKeyDown(KEY_DOWN)) enemyUnits[0].unitPos.z += 0.1f;
+        if (IsKeyDown(KEY_UP)) enemyUnits[0].unitPos.z -= 0.1f;
 
         if ((IsKeyPressed(KEY_SPACE)) && (!showDebug)) showDebug = true;
         if ((IsKeyPressed(KEY_P)) && (showDebug)) showDebug = false;
@@ -136,7 +135,7 @@ int main(void)
 
         if (IsMouseButtonPressed(MOUSE_BUTTON_RIGHT))  // Move selected units with RMB. This is also how we will select targets for my units
         {
-            for (int i = 0; i < NUMBER_OF_PLAYER_UNITS; i++)  // ITERATE THROUGH ALL UNITS
+            for (int i = 0; i < NUMBER_OF_PLAYER_UNITS; i++)  // ITERATE THROUGH ALL PLAYER CONTROLLED UNITS IN ORDER TO UPDATE THEIR WAYPOINT
             {
                 if (playerUnits[i].selected)  // ONLY WANT TO ALLOW SELECTED UNITS NEW WAYPOINTS
                 {
@@ -146,18 +145,54 @@ int main(void)
                         // perhaps just rounding the huge floats is a better idea so that equillibrium can be attained. if waypoint == unitpos, play animation x
                 }
             }
+
+            objectCollision.hit = false;
+
+            // Check collision between ray and every enemy unit (except the ground). This can be refined using a quadtree!
+            for (int i = 0; i < NUMBER_OF_ENEMY_UNITS; i++) 
+            {
+                objectCollision = GetRayCollisionBox(ray,
+                                        (BoundingBox){(Vector3){ enemyUnits[i].unitPos.x - enemyUnits[i].unitSize.x/2, enemyUnits[i].unitPos.y - enemyUnits[i].unitSize.y/2, enemyUnits[i].unitPos.z - enemyUnits[i].unitSize.z/2 },
+                                        (Vector3){ enemyUnits[i].unitPos.x + enemyUnits[i].unitSize.x/2, enemyUnits[i].unitPos.y + enemyUnits[i].unitSize.y/2, enemyUnits[i].unitPos.z + enemyUnits[i].unitSize.z/2 }});
+
+                if (objectCollision.hit) // Upon finding a collision between the mouse and an enemy
+                {
+                    for (int j = 0; j < NUMBER_OF_PLAYER_UNITS; j++)  // Iterate through all player controlled units
+                    {
+                        if (playerUnits[j].selected) // Identifying which of them are selected, so that they begin targeting the right clicked enemy
+                        {
+                            playerUnits[j].targeting = &enemyUnits[i].unitPos;  // this should allow the targeting pointer to update as the enemy position changes
+                        }
+                    }
+                    break;  // Break out of parent for loop so that the targeting members are not overwritten
+                }
+                else // if no enemy collision was found,
+                {
+                    for (int j = 0; j < NUMBER_OF_PLAYER_UNITS; j++)  // All currently selected units should lose their target
+                    {
+                        if (playerUnits[j].selected) 
+                        {
+                            playerUnits[j].targeting = NULL;
+                        }
+                    }
+                }
+            }
         }
         // END OF MOUSE CONTROLS ----------------------------------------------------------------
 
-        for (int i = 0; i < NUMBER_OF_PLAYER_UNITS; i++) // FOR MOVING SELECTED UNITS
+
+        for (int i = 0; i < NUMBER_OF_PLAYER_UNITS; i++) // FOR MOVING SELECTED UNITS. Link this to the timer later on
         {
-            if (playerUnits[i].unitPos.x < playerUnits[i].waypoint.x) playerUnits[i].unitPos.x += playerUnits[i].unitSpeed;  // these increments are large to achieve equillibrium between waypoint and unit coordinates
+            // Following an enemy target
+            // ... 
+            
+            // Following the waypoint
+            if (playerUnits[i].unitPos.x < playerUnits[i].waypoint.x) playerUnits[i].unitPos.x += playerUnits[i].unitSpeed;  // these increments are too large to achieve equillibrium between waypoint and unit coordinates
             if (playerUnits[i].unitPos.x > playerUnits[i].waypoint.x) playerUnits[i].unitPos.x -= playerUnits[i].unitSpeed;
             if (playerUnits[i].unitPos.z < playerUnits[i].waypoint.z) playerUnits[i].unitPos.z += playerUnits[i].unitSpeed;
             if (playerUnits[i].unitPos.z > playerUnits[i].waypoint.z) playerUnits[i].unitPos.z -= playerUnits[i].unitSpeed;
+
         }
-
-
 
         // Draw
         BeginDrawing();
@@ -166,21 +201,30 @@ int main(void)
 
             BeginMode3D(camera);
 
-                // Highlight them if they are selected/hit
+                // Draw player characters
                 for (int i = 0; i < NUMBER_OF_PLAYER_UNITS; i++) {  // Iterate through the player units
 
-                    DrawCube(playerUnits[i].unitPos, playerUnits[i].unitSize.x, playerUnits[i].unitSize.y, playerUnits[i].unitSize.z, playerUnits[i].color);  // unit 1
+                    DrawCube(playerUnits[i].unitPos, playerUnits[i].unitSize.x, playerUnits[i].unitSize.y, playerUnits[i].unitSize.z, playerUnits[i].colour); 
                     DrawCubeWires(playerUnits[i].unitPos, playerUnits[i].unitSize.x, playerUnits[i].unitSize.y, playerUnits[i].unitSize.z, DARKGRAY);
                 
-                    if (playerUnits[i].selected) // To check which of them are selected. then draw a wireframe around those that are
+                    if (playerUnits[i].selected) // Draw a wireframe around those that are selected
                     {
                         DrawCubeWires(playerUnits[i].unitPos, playerUnits[i].unitSize.x, playerUnits[i].unitSize.y, playerUnits[i].unitSize.z, MAROON);
                         DrawCubeWires(playerUnits[i].unitPos, playerUnits[i].unitSize.x + 0.2f, playerUnits[i].unitSize.y + 0.2f, playerUnits[i].unitSize.z + 0.2f, GREEN);
+                        // Wireframe around the enemy the selected unit is currently targeting
+                        if (playerUnits[i].targeting != NULL) // Avoids a crash if the selected unit is not currently targeting anything
+                        {
+                            DrawCubeWires((Vector3){playerUnits[i].targeting->x, 1.0f, playerUnits[i].targeting->z}, 1.2f, 2.2f, 1.2f, YELLOW);
+                        }
                     }
                 }
-
-                DrawCube(enemyUnits[0].unitPos, enemyUnits[0].unitSize.x, enemyUnits[0].unitSize.y, enemyUnits[0].unitSize.z, enemyUnits[0].color);  // unit 1
-                DrawCubeWires(enemyUnits[0].unitPos, enemyUnits[0].unitSize.x, enemyUnits[0].unitSize.y, enemyUnits[0].unitSize.z, DARKGRAY);
+                
+                // Draw enemies
+                for (int i = 0; i < NUMBER_OF_ENEMY_UNITS; i++) 
+                {
+                    DrawCube(enemyUnits[i].unitPos, enemyUnits[i].unitSize.x, enemyUnits[i].unitSize.y, enemyUnits[i].unitSize.z, enemyUnits[i].colour); 
+                    DrawCubeWires(enemyUnits[i].unitPos, enemyUnits[i].unitSize.x, enemyUnits[i].unitSize.y, enemyUnits[i].unitSize.z, DARKGRAY);
+                }
                 
                 // This lets me see where the invisible bounding box will be created for debugging purposes
                 DrawCube((Vector3){save3DMouseStartPos.x, 0.0f, save3DMouseStartPos.z}, 0.1f, 0.1f, 0.1f, GRAY);
@@ -195,17 +239,21 @@ int main(void)
                 DrawCube(groundCollision.point, 0.1f, 0.1f, 0.1f, GRAY);
                 DrawLine3D(groundCollision.point, normalEnd, RED);
                 
-                DrawGrid(10, 1.0f);        // Draw a grid (slices, spacing)
+                DrawGrid(10, 1.0f);  // Draw a grid (slices, spacing)
 
             EndMode3D();
 
             DrawText("Select cuboid with left click and control it with right click.", 400, 100, 20, GRAY);
 
+            DrawFPS(10, 10);
+
             if (showDebug) 
             {
-                DrawFPS(10, 10);
-                DrawText(TextFormat("playerUnits[0].unitPos.x = %f,\n\nplayerUnits[0].unitPos.z= %f", playerUnits[0].unitPos.x, playerUnits[0].unitPos.z), 30, 220, 30, LIGHTGRAY);
-                DrawText(TextFormat("ticker= %d", ticker), 30, 140, 30, LIGHTGRAY);
+                for (int i = 0; i < NUMBER_OF_PLAYER_UNITS; i++) 
+                {
+                    if (playerUnits[i].targeting != NULL) DrawText(TextFormat("playerUnits[%d].targeting x = %f  \n\n  y= %f  \n\n  z = %f", i, playerUnits[i].targeting->x, playerUnits[i].targeting->y, playerUnits[i].targeting->z), 30, i * 100, 30, DARKGRAY);
+                }
+                // DrawText(TextFormat("ticker= %d", ticker), 30, 140, 30, LIGHTGRAY);
             }
 
         EndDrawing();
