@@ -1,9 +1,9 @@
 #include "raylib.h"
+#include "structs.h"
+#include "functions.h"
+#include <stdlib.h>
 
-typedef struct Wall { 
-    int id; 
-    Color color;
-} Wall;
+#define TILE_SIZE 1.0f
 
 int main(void)
 {
@@ -15,47 +15,10 @@ int main(void)
     Camera camera = { { 0.0f, 10.0f, 10.0f }, { 0.0f, 0.0f, 0.0f }, { 0.0f, 1.0f, 0.0f }, 45.0f, 0 };
     float cameraSpeed = 0.5;
 
-    // Wall attributes
-    Wall greyWall = {1, GRAY};
-    Wall pinkWall = {2, PINK};
+    int numberOfWalls = 0;  // check that number of walls is as expected
+    Wall *walls = CompileMapData(&numberOfWalls);
 
-    #define TILE_SIZE 1.0f
-    #define NUMBER_OF_TILES 432
-    #define ROWS 18  // IMPORTANT TO UPDATE THESE IF THE MAP DIMENSIONS CHANGE 
-    #define COLUMNS 24
-
-    // WALLS = 1, EMPTY SPACE = 0
-    int layout[ROWS][COLUMNS] = {
-        //0, 1  2  3  4  5  6  7  8  9  10 11 12 13 14 15 16 17 18 19 20 21 22 23
-        { 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2 },  // 0
-        { 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1 },  // 1
-        { 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1 },  // 2
-        { 1, 0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1 },  // 3
-        { 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1 },  // 4
-        { 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1 },  // 5
-        { 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1 },  // 6
-        { 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1 },  // 7
-        { 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1 },  // 8
-        { 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1 },  // 9
-        { 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1 },  // 10
-        { 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1 },  // 11
-        { 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1 },  // 12
-        { 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1 },  // 13
-        { 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1 },  // 14
-        { 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1 },  // 16
-        { 2, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 2 }   // 17
-    };
-
-    int sumOfWalls = 0;
-
-    // Determining how many walls have been generated
-    for (int row = 0; row < ROWS; row++) {
-        for (int column = 0; column < COLUMNS; column++) {
-            if (layout[row][column] > 0) sumOfWalls ++;  // Walls will have values higher than 1 and this accounts for that fact
-        }
-    }
-
-    SetTargetFPS(60);               // Set our game to run at 60 frames-per-second
+    SetTargetFPS(60);
 
     // Main game loop -------------------------------------------------------------
     while (!WindowShouldClose())    // Detect window close button or ESC key
@@ -68,44 +31,29 @@ int main(void)
         camera.position.y -= (GetMouseWheelMove()*cameraSpeed);  // CAMERA UP
         camera.target.y -= (GetMouseWheelMove()*cameraSpeed);  
         camera.position.z -= (GetMouseWheelMove()*0.6);
-        
+
         // Draw
-        //----------------------------------------------------------------------------------
         BeginDrawing();
 
             ClearBackground(RAYWHITE);
 
             BeginMode3D(camera);
 
-                // --------------------------------------------
-                DrawGrid(20, TILE_SIZE); 
-                // --------------------------------------------
-
-                // finds the correct coordinate based on array size 
-                float axisZ = ((ROWS * -1) / 2) + 0.5;  
-                float axisX = ((COLUMNS * -1) / 2) + 0.5;
-
-                // Draw boxes. in order to please the GPU, when we have different textures demanded by different cube types, we could print all of one type first, then proceed onto next type, und so weiter
-                for (int i = 0; i < ROWS; i++) {
-                    for (int j = 0; j < COLUMNS; j++) {
-                        
-                        if (layout[i][j] == greyWall.id) DrawCube((Vector3){axisX, 0.5f, axisZ}, TILE_SIZE, 0.5f, TILE_SIZE, greyWall.color);
-                        else if (layout[i][j] == pinkWall.id) DrawCube((Vector3){axisX, 0.5f, axisZ}, TILE_SIZE, 0.5f, TILE_SIZE, pinkWall.color);
-                        axisX++;   
-                    }
-                    axisX = ((COLUMNS * -1) / 2) + 0.5;
-                    axisZ++;
+                DrawGrid(30, TILE_SIZE); 
+                for (int i = 0; i < numberOfWalls; i++)
+                {
+                    DrawCube(walls[i].position, TILE_SIZE, 0.5f, TILE_SIZE, walls[i].colour);
                 }
-                
+
             EndMode3D();
 
             DrawFPS(10, 10);
 
         EndDrawing();
-        //----------------------------------------------------------------------------------
     }
 
     // De-Initialization
+    free(walls);
     CloseWindow();        // Close window and OpenGL context
 
     return 0;
