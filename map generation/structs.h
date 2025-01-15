@@ -18,7 +18,7 @@ typedef struct Wall {
 // Player units and enemy units
 typedef struct Unit {
     Vector3 position;  // X = East and West. Y = Up and Down. Z = North and South.
-    Vector3 waypoint; // must always start with identical coords as unitPos
+    Vector3 waypoint; // must always start with identical coords as unitPos. this could be an array to store consecutive vectors if shift + RMG are pressed in combination
     Vector3 size;
     Vector2 screenPos; // strictly used for drawing text above unit. possibly not necessary
     float speed;
@@ -32,5 +32,22 @@ typedef struct Unit {
     Timer ticker;
     Color colour;
 } Unit;
+
+// quad tree related ------- 
+typedef struct Boundary {
+    float x;
+    float z;
+    float halfWidth;
+} Boundary;
+
+typedef struct QuadtreeNode {
+    Boundary boundary;               // Region boundary
+    Vector3* points;                   // Points in this node
+    int pointCount;                  // Number of points stored
+    int capacity;                    // Maximum points this node can hold before splitting
+    struct QuadtreeNode* children[4]; // Child nodes (NW, NE, SW, SE)
+    int isDivided;                   // Indicates whether the node has been divided
+} QuadtreeNode;
+// ---------------------------
 
 #endif
