@@ -9,15 +9,28 @@
 #define GRID_HEIGHT 10
 #define TILE_SIZE 1.0f
 
+typedef struct PFNode {
+    int x, y; // Position on the grid
+    float gCost, hCost, fCost; // Costs
+    struct PFNode* parent; // Parent node for path reconstruction
+    int walkable; // 1 if walkable, 0 if not
+} PFNode;
+
+typedef struct PFPath {
+    //PlaneVector* path;  //  can reduce it to planeVector later on
+    PFNode* node;
+    int numberOfTiles;
+} PFPath;
+
 // Function to calculate the heuristic (Euclidean distance)
-float calculateHeuristic(Node* a, Node* b) {
+float calculateHeuristic(PFNode* a, PFNode* b) {
     return sqrtf((a->x - b->x) * (a->x - b->x) + (a->y - b->y) * (a->y - b->y));
 }
 
 // Function to find the node with the lowest fCost in the open list
-Node* findLowestFCostNode(Node** openList, int openListSize) // whenever an array is passed as an argument, the array decays to a pointer to its first element. hence the pointer to a pointer Node**
+PFNode* findLowestFCostNode(PFNode** openList, int openListSize) // whenever an array is passed as an argument, the array decays to a pointer to its first element. hence the pointer to a pointer PFNode**
 {
-    Node* lowest = openList[0];  // asserts that the lowest F cost is openList[0]
+    PFNode* lowest = openList[0];  // asserts that the lowest F cost is openList[0]
     for (int i = 1; i < openListSize; i++) // then checks that fact against all other F costs in openList[]
     {
         if (openList[i]->fCost < lowest->fCost || 
@@ -29,7 +42,7 @@ Node* findLowestFCostNode(Node** openList, int openListSize) // whenever an arra
 }
 
 // Checks if the node is present in the list
-int isNodeInList(Node** list, int listSize, Node* node) 
+int isNodeInList(PFNode** list, int listSize, PFNode* node) 
 {
     for (int i = 0; i < listSize; i++) 
     {
@@ -41,7 +54,7 @@ int isNodeInList(Node** list, int listSize, Node* node)
 }
 
 // Get neighbors of a node                              
-int getNeighbors(Node grid[GRID_WIDTH][GRID_HEIGHT], Node* currentNode, Node** neighbors) {
+int getNeighbors(PFNode grid[GRID_WIDTH][GRID_HEIGHT], PFNode* currentNode, PFNode** neighbors) {
     int count = 0;
     for (int dx = -1; dx <= 1; dx++) {  // starts at the west
         for (int dy = -1; dy <= 1; dy++) // south corner (southwest)
@@ -61,24 +74,42 @@ int getNeighbors(Node grid[GRID_WIDTH][GRID_HEIGHT], Node* currentNode, Node** n
 }
 
 // Reconstruct the path from the end node to the start node
-void reconstructPath(Node* endNode) 
+PFPath reconstructPath(PFNode* endNode) 
 {
-    int numberOfNodes = 0;  // incrememt this with each loop iteration to inform malloc
-    Node* current = endNode;
-    while (current != NULL) // turn into a for loop which populates a pointer of nodes
+    PFPath path;
+    path.numberOfTiles = 0;
+
+    PFNode* current = endNode;
+    while (current != NULL) // The loop is purely to count path.numberOfTiles
     {
-        printf("(%d, %d) ", current->x, current->y);
-        current = current->parent; // the parent of the very first node would be null
+        current = current->parent; // the parent of the very first node will be null
+        path.numberOfTiles++;
     }
-    printf("\n");  // then return the pointer
+
+    path.node = (PFNode*)malloc(path.numberOfTiles * sizeof(PFNode));
+    
+    current = endNode;
+    for (int i = 0; i < path.numberOfTiles; i++) // Populating array with nodes going from end to start
+    {
+        path.node[i] = *current;
+        current = current->parent; 
+    }
+
+    for (int i = 0; i < path.numberOfTiles / 2; i++) // Reversing the variable so that it's easy for a unit to follow
+    {
+        PFNode temp = path.node[i];
+        path.node[i] = path.node[path.numberOfTiles - 1 - i];
+        path.node[path.numberOfTiles - 1 - i] = temp;
+    }
+
+    return path; 
 }
 
 // A* algorithm  THE ENTIRE PROGRAM IS BASICALLY JUST THIS FUNCTION======================================
-void aStar(Node grid[GRID_WIDTH][GRID_HEIGHT], Node* startNode, Node* endNode) 
-{
+// void aStar(PFNode grid[GRID_WIDTH][GRID_HEIGHT], PFNode* startNode, PFNode* endNode) 
+// {
 
-    printf("No path found!\n");  // return null is better
-}
+// }
 
 int main(void)
 {
@@ -87,7 +118,7 @@ int main(void)
     InitWindow(screenWidth, screenHeight, "raylib pf");
     Camera camera = { { 5.0f, 10.0f, 10.0f }, { 5.0f, 0.0f, 5.0f }, { 0.0f, 1.0f, 0.0f }, 45.0f, 0 };
 
-    Node grid[GRID_WIDTH][GRID_HEIGHT];
+    PFNode grid[GRID_WIDTH][GRID_HEIGHT];
 
     // Initialize the grid. Goes through every node in the grid and assigns it:
     for (int x = 0; x < GRID_WIDTH; x++) {
@@ -105,19 +136,18 @@ int main(void)
     grid[4][5].walkable = 0;
     grid[4][6].walkable = 0;
 
-    //Node* debuggingNode;  // debuggingNode = currentNode. in order to easily print things like h cost, f cost, g cost. drawtext(debuggingnode.hcost etc)
-
-    Node* startNode = &grid[0][0];
-    Node* endNode = &grid[9][9];
+    PFNode* startNode = &grid[0][0];
+    PFNode* endNode = &grid[9][9];
+    PFPath path = { 0 };
 
     // --------------------------------------------------------------------------------------------
     //aStar(grid, startNode, endNode);
     // --------------------------------------------------------------------------------------------
 
-    Node* openList[GRID_WIDTH * GRID_HEIGHT];  // CREATING AN ARRAY WITH THE TOTAL AMOUNT OF TILES AS ITS SIZE
+    PFNode* openList[GRID_WIDTH * GRID_HEIGHT];  // CREATING AN ARRAY WITH THE TOTAL AMOUNT OF TILES AS ITS SIZE
     int openListSize = 0;
 
-    Node* closedList[GRID_WIDTH * GRID_HEIGHT];  // CREATING AN ARRAY WITH THE TOTAL AMOUNT OF TILES AS ITS SIZE
+    PFNode* closedList[GRID_WIDTH * GRID_HEIGHT];  // CREATING AN ARRAY WITH THE TOTAL AMOUNT OF TILES AS ITS SIZE
     int closedListSize = 0;
 
     openList[openListSize++] = startNode;  // putting the first node into the start list and then incrementing by 1?
@@ -134,7 +164,7 @@ int main(void)
 
         if (IsKeyPressed(KEY_SPACE))
         {
-            Node* currentNode = findLowestFCostNode(openList, openListSize);  // assigns current node to node with lowest F cost
+            PFNode* currentNode = findLowestFCostNode(openList, openListSize);  // assigns current node to node with lowest F cost
 
             // Remove currentNode from openList
             for (int i = 0; i < openListSize; i++) // iterates through openList
@@ -148,17 +178,17 @@ int main(void)
 
             closedList[closedListSize++] = currentNode;  // adds currentNode to closedList and increases closedListSize by 1
 
-            if (currentNode == endNode) {  // exit function if currentNode is endNode
-                reconstructPath(endNode);
-                return;
+            if (currentNode == endNode) // exit function if currentNode is endNode
+            {  
+                path = reconstructPath(endNode);
             }
 
-            Node* neighbors[8];  // else: create a pointer to an array of 8 neighbours
+            PFNode* neighbors[8];  // else: create a pointer to an array of 8 neighbours
             int neighborCount = getNeighbors(grid, currentNode, neighbors);  // stores 8 nodes (that neighbour currentNode) in neighbours array and returns number of neighbours created. only neighbours that are out of bounds or inside a wall do not get created
 
             for (int i = 0; i < neighborCount; i++) // iterates through the newly made neighbours array
             {
-                Node* neighbor = neighbors[i];  
+                PFNode* neighbor = neighbors[i];  
 
                 if (isNodeInList(closedList, closedListSize, neighbor)) {
                     continue;  // continuing here means skip everything below it and move onto the next iteration
@@ -205,16 +235,27 @@ int main(void)
                     DrawCube((Vector3){closedList[i]->x, 0.05, closedList[i]->y}, 0.75f, 0.1f, 0.75f, RED);
                 }
 
+                for (int i = 0; i < path.numberOfTiles; i++) {
+                    DrawCube((Vector3){path.node[i].x, 0.05, path.node[i].y}, 0.75f, 0.2f, 0.75f, LIGHTGRAY);
+                }
+
                 DrawGrid(GRID_HEIGHT * 2, 1.0f);        // Draw a grid
 
             EndMode3D();
 
             DrawFPS(10, 10);
+            if (path.numberOfTiles != 0) {
+                for (int i = 0; i < path.numberOfTiles; i++) 
+                {
+                    DrawText(TextFormat("path.node[%d] = %d, %d", i, path.node[i].x, path.node[i].y), 30, i * 35, 30, DARKGRAY);
+                }
+            }
 
         EndDrawing();
         //----------------------------------------------------------------------------------
     }
 
+    free(path.node);
     CloseWindow();        // Close window and OpenGL context
 
     return 0;
