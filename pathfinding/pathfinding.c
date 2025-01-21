@@ -9,8 +9,12 @@
 #define GRID_HEIGHT 10
 #define TILE_SIZE 1.0f
 
+// to do:
+// make algorithm independent from built in grid. it should detect walls based on collision or wall data overlap, not whether a node is marked as a wall or not
+// 
+
 typedef struct PFNode {
-    int x, y; // Position on the grid
+    PlaneVector position;
     float gCost, hCost, fCost; // Costs
     struct PFNode* parent; // Parent node for path reconstruction
     int walkable; // 1 if walkable, 0 if not
@@ -24,7 +28,7 @@ typedef struct PFPath {
 
 // Function to calculate the heuristic (Euclidean distance)
 float calculateHeuristic(PFNode* a, PFNode* b) {
-    return sqrtf((a->x - b->x) * (a->x - b->x) + (a->y - b->y) * (a->y - b->y));
+    return sqrtf((a->position.x - b->position.x) * (a->position.x - b->position.x) + (a->position.z - b->position.z) * (a->position.z - b->position.z));
 }
 
 // Function to find the node with the lowest fCost in the open list
@@ -46,7 +50,7 @@ int isNodeInList(PFNode** list, int listSize, PFNode* node)
 {
     for (int i = 0; i < listSize; i++) 
     {
-        if (list[i]->x == node->x && list[i]->y == node->y) {  // this can be simplified through use of vector struct
+        if (list[i]->position.x == node->position.x && list[i]->position.z == node->position.z) {  // this can be simplified through use of vector struct
             return 1;
         }
     }
@@ -57,16 +61,16 @@ int isNodeInList(PFNode** list, int listSize, PFNode* node)
 int getNeighbors(PFNode grid[GRID_WIDTH][GRID_HEIGHT], PFNode* currentNode, PFNode** neighbors) {
     int count = 0;
     for (int dx = -1; dx <= 1; dx++) {  // starts at the west
-        for (int dy = -1; dy <= 1; dy++) // south corner (southwest)
+        for (int dz = -1; dz <= 1; dz++) // south corner (southwest)
         {  
-            if (dx == 0 && dy == 0) continue; // Skip the current node
+            if (dx == 0 && dz == 0) continue; // Skip the current node
 
-            int nx = currentNode->x + dx;  // taking currentNode.x, adding dx (which could be a negative number) to it  and then storing it in nx
-            int ny = currentNode->y + dy;  // taking currentNode.y, adding dy to it and then storing it in ny
+            int nx = currentNode->position.x + dx;  // taking currentNode.x, adding dx (which could be a negative number) to it  and then storing it in nx
+            int nz = currentNode->position.z + dz;  // taking currentNode.y, adding dy to it and then storing it in ny
 
             //    <<<<<ensure it is within the bounds of the map>>>>>>>         ensure not a wall
-            if (nx >= 0 && nx < GRID_WIDTH && ny >= 0 && ny < GRID_HEIGHT && grid[nx][ny].walkable) {
-                neighbors[count++] = &grid[nx][ny];  // add the node at grid[nx][ny] to neighbors and increment count by 1
+            if (nx >= 0 && nx < GRID_WIDTH && nz >= 0 && nz < GRID_HEIGHT && grid[nx][nz].walkable) {
+                neighbors[count++] = &grid[nx][nz];  // add the node at grid[nx][ny] to neighbors and increment count by 1
             }
         }
     }
@@ -105,12 +109,6 @@ PFPath reconstructPath(PFNode* endNode)
     return path; 
 }
 
-// A* algorithm  THE ENTIRE PROGRAM IS BASICALLY JUST THIS FUNCTION======================================
-// void aStar(PFNode grid[GRID_WIDTH][GRID_HEIGHT], PFNode* startNode, PFNode* endNode) 
-// {
-
-// }
-
 int main(void)
 {
     const int screenWidth = 1400;
@@ -122,12 +120,12 @@ int main(void)
 
     // Initialize the grid. Goes through every node in the grid and assigns it:
     for (int x = 0; x < GRID_WIDTH; x++) {
-        for (int y = 0; y < GRID_HEIGHT; y++) {
-            grid[x][y].x = x;  // coordinates
-            grid[x][y].y = y;
-            grid[x][y].gCost = grid[x][y].hCost = grid[x][y].fCost = 0;  // costs
-            grid[x][y].parent = NULL;
-            grid[x][y].walkable = 1; // All nodes are walkable by default
+        for (int z = 0; z < GRID_HEIGHT; z++) {
+            grid[x][z].position.x = x;  // coordinates
+            grid[x][z].position.z = z;
+            grid[x][z].gCost = grid[x][z].hCost = grid[x][z].fCost = 0;  // costs
+            grid[x][z].parent = NULL;
+            grid[x][z].walkable = 1; // All nodes are walkable by default
         }
     }
 
@@ -140,9 +138,7 @@ int main(void)
     PFNode* endNode = &grid[9][9];
     PFPath path = { 0 };
 
-    // --------------------------------------------------------------------------------------------
     //aStar(grid, startNode, endNode);
-    // --------------------------------------------------------------------------------------------
 
     PFNode* openList[GRID_WIDTH * GRID_HEIGHT];  // CREATING AN ARRAY WITH THE TOTAL AMOUNT OF TILES AS ITS SIZE
     int openListSize = 0;
@@ -152,16 +148,11 @@ int main(void)
 
     openList[openListSize++] = startNode;  // putting the first node into the start list and then incrementing by 1?
 
-    SetTargetFPS(60);               // Set our game to run at 60 frames-per-second
+    SetTargetFPS(60);  // Set our game to run at 60 frames-per-second
 
     // Main game loop
     while (!WindowShouldClose())    // Detect window close button or ESC key
     {
-        if (IsKeyDown(KEY_W)) camera.position.z -= 0.1, camera.target.z -= 0.1;
-        if (IsKeyDown(KEY_A)) camera.position.x -= 0.1, camera.target.x -= 0.1;
-        if (IsKeyDown(KEY_S)) camera.position.z += 0.1, camera.target.z += 0.1;
-        if (IsKeyDown(KEY_D)) camera.position.x += 0.1, camera.target.x += 0.1;
-
         if (IsKeyPressed(KEY_SPACE))
         {
             PFNode* currentNode = findLowestFCostNode(openList, openListSize);  // assigns current node to node with lowest F cost
@@ -228,15 +219,15 @@ int main(void)
                 DrawCube((Vector3){9, 0.5, 9}, 0.75f, 1.0f, 0.75f, GOLD);
 
                 for (int i = 0; i < openListSize; i++) {
-                    DrawCube((Vector3){openList[i]->x, 0.05, openList[i]->y}, 0.75f, 0.1f, 0.75f, GREEN);
+                    DrawCube((Vector3){openList[i]->position.x, 0.05, openList[i]->position.z}, 0.75f, 0.1f, 0.75f, GREEN);
                 }                
                 
                 for (int i = 0; i < closedListSize; i++) {
-                    DrawCube((Vector3){closedList[i]->x, 0.05, closedList[i]->y}, 0.75f, 0.1f, 0.75f, RED);
+                    DrawCube((Vector3){closedList[i]->position.x, 0.05, closedList[i]->position.z}, 0.75f, 0.1f, 0.75f, RED);
                 }
 
                 for (int i = 0; i < path.numberOfTiles; i++) {
-                    DrawCube((Vector3){path.node[i].x, 0.05, path.node[i].y}, 0.75f, 0.2f, 0.75f, LIGHTGRAY);
+                    DrawCube((Vector3){path.node[i].position.x, 0.05, path.node[i].position.z}, 0.75f, 0.2f, 0.75f, LIGHTGRAY);
                 }
 
                 DrawGrid(GRID_HEIGHT * 2, 1.0f);        // Draw a grid
@@ -247,7 +238,7 @@ int main(void)
             if (path.numberOfTiles != 0) {
                 for (int i = 0; i < path.numberOfTiles; i++) 
                 {
-                    DrawText(TextFormat("path.node[%d] = %d, %d", i, path.node[i].x, path.node[i].y), 30, i * 35, 30, DARKGRAY);
+                    DrawText(TextFormat("path.node[%d] = %.f, %.f", i, path.node[i].position.x, path.node[i].position.z), 30, i * 35, 30, DARKGRAY);
                 }
             }
 
