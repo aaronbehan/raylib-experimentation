@@ -40,6 +40,7 @@ PFPath reconstructPath(PFNode* endNode)
         path.numberOfTiles++;
     }
 
+    // creating a DEEP copy! that means we can free all other memory used to get to this point
     path.node = (PFNode*)malloc(path.numberOfTiles * sizeof(PFNode));  // path.node is a pointer struct member and we must declare how many nodes go into it
     
     current = endNode;
@@ -83,7 +84,7 @@ int getNeighbors(Wall* walls, int numberOfWalls, PFNode* currentNode, PFNode** n
                 
                 if (i == (numberOfWalls - 1)) // on the very last iteration of the for loop
                 {
-                    PFNode* neighborNode = (PFNode*)calloc(1, sizeof(PFNode));  // calloc each time a neighbour is initialised? is this a good idea? 
+                    PFNode* neighborNode = (PFNode*)calloc(1, sizeof(PFNode));  // initialise the node. apparently very expensive to calloc every time. probably stupid. chatgpt implies i should abandon the idea
                     neighborNode->position.x = nx;
                     neighborNode->position.z = nz;
 
@@ -115,27 +116,20 @@ float calculateHeuristic(PFNode* a, PFNode* b) {
     return sqrtf((a->position.x - b->position.x) * (a->position.x - b->position.x) + (a->position.z - b->position.z) * (a->position.z - b->position.z));
 }
 
-
-int main(void)
+PFPath astar(PlaneVector currentPos, PlaneVector targetPos, Wall* walls, int numberOfWalls) 
 {
-    const int screenWidth = 1400;
-    const int screenHeight = 850;
-    InitWindow(screenWidth, screenHeight, "raylib pf");
-    Camera camera = { { 5.0f, 10.0f, 10.0f }, { 5.0f, 0.0f, 5.0f }, { 0.0f, 1.0f, 0.0f }, 45.0f, 0 };
-    SetTargetFPS(60);  // Set our game to run at 60 frames-per-second
-
     // Initialising start and end nodes
     PFNode* startNode = (PFNode*)malloc(sizeof(PFNode));  // don't forget to free this and the endNode!
-    startNode->position.x = 0;
-    startNode->position.z = 0;
+    startNode->position.x = currentPos.x;
+    startNode->position.z = currentPos.z;
     startNode->gCost = 0.0f;
     startNode->hCost = 0.0f;
     startNode->fCost = 0.0f;
     startNode->parent = NULL;
     
     PFNode* endNode = (PFNode*)malloc(sizeof(PFNode));
-    endNode->position.x = 9;
-    endNode->position.z = 9;
+    endNode->position.x = targetPos.x;
+    endNode->position.z = targetPos.z;
     endNode->gCost = 0.0f;
     endNode->hCost = 0.0f;
     endNode->fCost = 0.0f;
@@ -143,8 +137,8 @@ int main(void)
 
     PFPath path = { 0 };  // the path i can expect to return upon finding endNode
 
-    int openListAllowance = 10;
-    int closedListAllowance = 15;
+    int openListAllowance = 20;  // DELIBERATELY QUITE LOW SO THAT YOU REMEMBER TO FIX THIS!!!!!!!!
+    int closedListAllowance = 20;
 
     PFNode** openList = (PFNode**)malloc(sizeof(PFNode*) * openListAllowance);
     int openListSize = 0;
@@ -154,6 +148,99 @@ int main(void)
 
     openList[openListSize++] = startNode;  // putting the first node into the start list and then incrementing by 1
 
+    while (openListSize > 0) // loop will not stop until it has exhausted all nodes
+    {
+        PFNode* currentNode = findLowestFCostNode(openList, openListSize);  // searches through openList and assigns node with lowest F cost to current node
+
+        // Remove currentNode from openList
+        for (int i = 0; i < openListSize; i++) // iterates through openList
+        {
+            if (openList[i] == currentNode) // it finds the currentNode inside openList
+            {
+                openList[i] = openList[--openListSize];  // it takes the very last element in openList and puts it at the address currentNode was found at
+                break;
+            } // i get that you're concerned about the ACTUAL CONTENTS of the list, but, because openlistsize is decremented (momentarily) to 0, it is basically the same as being empty because the next value to be added to the list will be at index 0 because it has been reduced to this value on the first iteration of the root for loop
+        }
+        
+        // Before adding current node to closedList, check if memory has been exceeded and add more if necessary
+        if ((closedListSize + 1) >= closedListAllowance)  
+        {
+            closedListAllowance = 2 * closedListSize;
+            PFNode** temp = realloc(closedList, sizeof(PFNode*) * (closedListAllowance));  // not sure whether PFNode needs to be a pointer or a pointer to a pointer
+            if (temp) closedList = temp;
+        }
+        closedList[closedListSize++] = currentNode;  // adds currentNode to closedList and increases closedListSize by 1
+            
+        if ((currentNode->position.x == endNode->position.x) && (currentNode->position.z == endNode->position.z))  // exit function if currentNode has reached endNode coordinates
+        {
+            path = reconstructPath(currentNode);  // make sure that this is a deep copy of path data
+
+            // free all memory
+            for (int i = 0; i < openListSize; i++) free(openList[i]);
+            free(openList);
+
+            for (int i = 0; i < closedListSize; i++) free(closedList[i]);   // where the error occurs!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            free(closedList);
+
+            return path;
+        }
+
+        PFNode* neighbors[8];  // creates a pointer to an array of 8 neighbours
+        int neighborCount = getNeighbors(walls, numberOfWalls, currentNode, neighbors);  // stores 8 nodes (that neighbour currentNode) in neighbours array and returns number of neighbours created. only neighbours that are out of bounds or inside a wall do not get created
+
+        for (int i = 0; i < neighborCount; i++) // iterates through the newly made neighbours array
+        {
+            PFNode* neighbor = neighbors[i];
+
+            if (isNodeInList(closedList, closedListSize, neighbor)) {
+                free(neighbor);
+                continue;  // skip everything below it and move onto the next iteration
+            }
+
+            float tentativeGCost = currentNode->gCost + calculateHeuristic(currentNode, neighbor);  // this does work for getting the g cost. you take the g cost from parent node and add 1 or 1.4. i'm guessing these values are returned from the calculateH func
+
+            if (!isNodeInList(openList, openListSize, neighbor)) // if node is not in the openList: add it to the open list. !!!!!!! significant step!
+            {  
+                if ((openListSize + 1) >= openListAllowance) { // checking if more memory is needed
+                    openListAllowance = 2 * openListSize;
+                    PFNode** temp = realloc(openList, sizeof(PFNode*) * (openListAllowance));  // is this honestly right?
+                    if (temp) openList = temp;
+                }
+                openList[openListSize++] = neighbor;
+            } else if (tentativeGCost >= neighbor->gCost) {  // if node is in the list and the newly calculated gcost is greater than its previously calculated gcost, skip to next iteration
+                free(neighbor);
+                continue;
+            }
+
+            // initialise its members 
+            neighbor->gCost = tentativeGCost;
+            neighbor->hCost = calculateHeuristic(neighbor, endNode);
+            neighbor->fCost = neighbor->gCost + neighbor->hCost;
+            neighbor->parent = currentNode;
+        }
+    }
+
+    return path;  // this just mitigates an annoying warning. 
+}
+
+
+int main(void)
+{
+    const int screenWidth = 1400;
+    const int screenHeight = 850;
+    InitWindow(screenWidth, screenHeight, "raylib pf");
+    Camera camera = { { 5.0f, 10.0f, 10.0f }, { 5.0f, 0.0f, 5.0f }, { 0.0f, 1.0f, 0.0f }, 45.0f, 0 };
+    SetTargetFPS(60);  // Set our game to run at 60 frames-per-second
+
+    PlaneVector startPos;
+    startPos.x = 0;
+    startPos.z = 0;
+
+    PlaneVector targetPos;
+    targetPos.x = 9;
+    targetPos.z = 9;
+
+    // Wall generation
     int numberOfWalls = 3;
     Wall* walls = (Wall*)calloc(numberOfWalls, sizeof(Wall));  // calloc is like malloc but initalises all bytes to 0. later we can link this pointer to actual map generation
     for (int i = 0; i < numberOfWalls; i++)
@@ -162,74 +249,11 @@ int main(void)
         walls[i].position.z = 4 + i;
     }
 
+    PFPath path = astar(startPos, targetPos, walls, numberOfWalls);
+
     // Main game loop  -------------------------------------------------------------------------------------------------------
     while (!WindowShouldClose())    // Detect window close button or ESC key
     {
-        // moved this here so that i can draw it to the screen for debugging 
-        PFNode* currentNode = findLowestFCostNode(openList, openListSize);  // assigns node with lowest F cost to current node
-
-        if (IsKeyPressed(KEY_SPACE))
-        {
-            // PFNode* currentNode = findLowestFCostNode(openList, openListSize);  // assigns node with lowest F cost to current node
-
-            // Remove currentNode from openList
-            for (int i = 0; i < openListSize; i++) // iterates through openList
-            {
-                if (openList[i] == currentNode) // it finds the currentNode inside openList
-                {
-                    openList[i] = openList[--openListSize];  // it takes the very last element in openList and puts it at the address currentNode was found at
-                    break;
-                } // i get that you're concerned about the ACTUAL CONTENTS of the list, but, because openlistsize is decremented to 0, it is basically the same as being empty because the next value to be added to the list will be at index 0 because it has been reduced to this value on the first iteration of the root for loop
-            }
-            
-            if ((closedListSize + 1) >= closedListAllowance)  // Before adding current node to closedList, check if memory has been exceeded and add more if necessary
-            {
-                closedListAllowance = 2 * closedListSize;
-                PFNode** temp = realloc(closedList, sizeof(PFNode) * (closedListAllowance));  // not sure whether PFNode needs to be a pointer or a pointer to a pointer
-                if (temp) closedList = temp;
-            }
-            closedList[closedListSize++] = currentNode;  // adds currentNode to closedList and increases closedListSize by 1
-            
-
-            if ((currentNode->position.x == endNode->position.x) && (currentNode->position.z == endNode->position.z))  // exit function if currentNode has reached endNode coordinates
-            {
-                path = reconstructPath(currentNode);
-            }
-
-            PFNode* neighbors[8];  // creates a pointer to an array of 8 neighbours
-            int neighborCount = getNeighbors(walls, numberOfWalls, currentNode, neighbors);  // stores 8 nodes (that neighbour currentNode) in neighbours array and returns number of neighbours created. only neighbours that are out of bounds or inside a wall do not get created
-
-            for (int i = 0; i < neighborCount; i++) // iterates through the newly made neighbours array
-            {
-                PFNode* neighbor = neighbors[i];
-
-                if (isNodeInList(closedList, closedListSize, neighbor)) {
-                    free(neighbor);
-                    continue;  // skip everything below it and move onto the next iteration
-                }
-
-                float tentativeGCost = currentNode->gCost + calculateHeuristic(currentNode, neighbor);  // this does work for getting the g cost. you take the g cost from parent node and add 1 or 1.4. i'm guessing these values are returned from the calculateH func
-
-                if (!isNodeInList(openList, openListSize, neighbor)) // if node is not in the openList: add it to the open list. !!!!!!! significant step!
-                {  
-                    if ((openListSize + 1) >= openListAllowance) { // checking if more memory is needed
-                        openListAllowance = 2 * openListSize;
-                        PFNode** temp = realloc(openList, sizeof(PFNode) * (openListAllowance));  // is this honestly right??????????????????????
-                        if (temp) openList = temp;
-                    }
-                    openList[openListSize++] = neighbor;
-                } else if (tentativeGCost >= neighbor->gCost) {  // if node is in the list and the newly calculated gcost is greater than its previously calculated gcost, skip to next iteration
-                    free(neighbor);
-                    continue;
-                }
-
-                // initialise its members 
-                neighbor->gCost = tentativeGCost;
-                neighbor->hCost = calculateHeuristic(neighbor, endNode);
-                neighbor->fCost = neighbor->gCost + neighbor->hCost;
-                neighbor->parent = currentNode;
-            }
-        }
 
         BeginDrawing();
 
@@ -237,24 +261,14 @@ int main(void)
 
             BeginMode3D(camera);
 
-                // Draw actual start node
-                DrawCube((Vector3){startNode->position.x, 0.05, startNode->position.z}, 0.75f, 0.1f, 0.75f, YELLOW);
-                // Draw actual end node
-                DrawCube((Vector3){endNode->position.x, 0.05, endNode->position.z}, 0.75f, 0.1f, 0.75f, BROWN);
+                // Draw current position
+                DrawCube((Vector3){startPos.x, 0.05, startPos.z}, 0.75f, 0.1f, 0.75f, YELLOW);
+                // Draw target position
+                DrawCube((Vector3){targetPos.x, 0.05, targetPos.z}, 0.75f, 0.1f, 0.75f, BROWN);
 
                 // Draw walls
                 for (int i = 0; i < numberOfWalls; i++) {
                     DrawCube((Vector3){walls[i].position.x, 0.5, walls[i].position.z}, 0.75f, 1.0f, 0.75f, GRAY);
-                }
-
-                // Draw open nodes
-                for (int i = 0; i < openListSize; i++) {
-                    DrawCube((Vector3){openList[i]->position.x, 0.05, openList[i]->position.z}, 0.75f, 0.1f, 0.75f, GREEN);
-                }
-                
-                // Draw closed nodes
-                for (int i = 0; i < closedListSize; i++) {
-                    DrawCube((Vector3){closedList[i]->position.x, 0.05, closedList[i]->position.z}, 0.75f, 0.1f, 0.75f, RED);
                 }
 
                 // Draw completed path
@@ -266,38 +280,12 @@ int main(void)
 
             EndMode3D();
 
-            // Debugging info --------------------------
-            DrawText(TextFormat("Current node position = x%f, z%f", currentNode->position.x, endNode->position.z), 800, 40, 15, BLACK);
-            DrawText(TextFormat("End node position = x%f, z%f", endNode->position.x, endNode->position.z), 800, 55, 15, BLACK);
-
-            if ((currentNode->position.x == endNode->position.x) && (currentNode->position.z == endNode->position.z)) { DrawText(TextFormat("CurrentNode coords == EndNode coords", currentNode->position.x, endNode->position.z), 10, 40, 15, BLACK); }
-            else { DrawText(TextFormat("CurrentNode != EndNode", currentNode->position.x, endNode->position.z), 10, 40, 15, BLACK); }
-
-            if (openList[0] != NULL) 
-            {
-                DrawText(TextFormat("openListSize = %d", openListSize), 800, 10, 15, DARKGRAY);
-                DrawText(TextFormat("closedListSize = %d", closedListSize), 800, 25, 15, DARKGRAY);
-            }
-
-            if (path.numberOfTiles != 0)
-            {
-                for (int i = 0; i < path.numberOfTiles; i++) 
-                {
-                    DrawText(TextFormat("path.node[%d] = %.f, %.f", i, path.node[i].position.x, path.node[i].position.z), 30, i * 35, 30, DARKGRAY);
-                }
-            }
-            // -------------------------------------------
-
         EndDrawing();
         //----------------------------------------------------------------------------------
     }
 
-    free(startNode);
-    free(endNode);
-    for (int i = 0; i < openListSize; i++) free(openList[i]);
-    free(openList);
-    for (int i = 0; i < closedListSize; i++) free(closedList[i]);
-    free(closedList);
+
+
     free(walls);
     free(path.node);  // i think this should only be freed once the character has reached their destination. 
     CloseWindow();        // Close window and OpenGL context
