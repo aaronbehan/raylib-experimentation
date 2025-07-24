@@ -3,7 +3,7 @@
 #define RAYGUI_IMPLEMENTATION
 #include <C:\raylib\raylib\src\raygui.h>
 
-#define BTN_NUM_FRAMES 3
+#define Q_NUM_FRAMES 2
 
 int main()
 {
@@ -14,12 +14,11 @@ int main()
     Camera camera = { { 0.0f, 10.0f, 10.0f }, { 0.0f, 0.0f, 0.0f }, { 0.0f, 1.0f, 0.0f }, 45.0f, 0 };
 
     // Button 
-    Texture2D button1 = LoadTexture("resources/button.png");
-    // Define frame rectangle for drawing
-    float frameHeight = (float)button1.height / BTN_NUM_FRAMES;
-    Rectangle sourceRec = { 0, 0, (float)button1.width, frameHeight };
-    // Define button bounds on screen
-    Rectangle btnBounds = { screenWidth/2.0f - button1.width/2.0f, screenHeight/2.0f - button1.height/BTN_NUM_FRAMES/2.0f, (float)button1.width, frameHeight };
+    Texture2D buttonQ = LoadTexture("resources/simplekeys/Q.png");
+    float frameWidth = (float)buttonQ.width / Q_NUM_FRAMES;
+    Rectangle sourceRec = { 0, 0, frameWidth, (float)buttonQ.height}; // defining how much of the sprite sheet we want to look at at one time. 
+    Rectangle btnBounds = { screenWidth/2.0f - buttonQ.width/2.0f, screenHeight/2.0f - buttonQ.height/Q_NUM_FRAMES/2.0f, frameWidth, (float)buttonQ.height};
+
 
     Vector2 mousePos = {0.0f, 0.0f};
     int btnState = 0;
@@ -36,11 +35,11 @@ int main()
 
         if (IsKeyDown(KEY_Q) || (CheckCollisionPointRec(mousePos, btnBounds) && IsMouseButtonDown(MOUSE_BUTTON_LEFT)))
         {
-            btnState = 2;
+            btnState = 1;
         }
-        else btnState = 1;
+        else btnState = 0;
 
-        sourceRec.y = btnState * frameHeight;
+        sourceRec.x = btnState * frameWidth;
 
         // Draw
         BeginDrawing();
@@ -64,12 +63,12 @@ int main()
                 if (result >= 0) showMessageBox = false;
             }
 
-            DrawTextureRec(button1, sourceRec, (Vector2){ btnBounds.x, btnBounds.y }, WHITE); // Draw button frame
+            DrawTextureRec(buttonQ, sourceRec, (Vector2){ btnBounds.x, btnBounds.y }, WHITE); // Draw button frame
 
         EndDrawing();
     }
 
-    UnloadTexture(button1);
+    UnloadTexture(buttonQ);
 
     CloseWindow();
     return 0;
