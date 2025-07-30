@@ -10,6 +10,7 @@ int main()
     int screenWidth = 1400;
     int screenHeight = 850;
     InitWindow(screenWidth, screenHeight, "raygui - controls test suite");
+    SetExitKey(-1);  // Disabling Raylib's default Esc key to close.
 
     Camera camera = { { 0.0f, 10.0f, 10.0f }, { 0.0f, 0.0f, 0.0f }, { 0.0f, 1.0f, 0.0f }, 45.0f, 0 };
 
@@ -53,14 +54,18 @@ int main()
 
             DrawRectangle(0, screenHeight - panelHeight, screenWidth, panelHeight, BLUE);
 
-            if (GuiButton((Rectangle){ 24, 24, 120, 30 }, "#191#Show Message")) showMessageBox = true;
+            if ((IsKeyPressed(KEY_ESCAPE)) || (GuiButton((Rectangle){ 24, 24, 120, 30 }, "#191#Show Message"))) showMessageBox = true;
 
             if (showMessageBox)
             {
                 int result = GuiMessageBox((Rectangle){ 85, 70, 250, 100 },
                     "#191#Message Box", "Hi! This is a message!", "Nice;Cool");
 
-                if (result >= 0) showMessageBox = false;
+                if (result >= 0) 
+                {
+                    CloseWindow();
+                    return 0;  // necessary to avoid seg fault on below lines 
+                }
             }
 
             DrawTextureRec(buttonQ, sourceRec, (Vector2){ btnBounds.x, btnBounds.y }, WHITE); // Draw button frame
