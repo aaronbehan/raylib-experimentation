@@ -89,12 +89,15 @@ Wall *CompileMapData(int *numberOfWalls) // eventually perhaps this can derive a
 }
 
 // Beginnings of a random map generating algorithm based off of Random Walk 
+#define N 50  // number of rows (vertical count [Y axis])
+#define M 50  // number of columns (horizontal count [X axis])
 
 typedef struct Vector2Int 
 {
     int x;
     int y;
 } Vector2Int;
+
 
 void randomDirection(Vector2Int* position)
 {
@@ -105,7 +108,11 @@ void randomDirection(Vector2Int* position)
     else if (randomNumber == 2) position->y ++; // down
     else if (randomNumber == 3) position->y --;  // up
 
-    // i do not account for the vector attempting to go out of bounds. will crash program
+    // Be careful as 2D arrays follow a YX axis (rows, then columns) rather than the XY (columns, then rows) convention 
+    if (position->y <= 0) position->y ++; // position y tried to exceed northern boundary
+    else if (position->y >= N) position->y --; // position y tried to exceed southern boundary
+    if (position->x <= 0) position->x ++;  // position x tried to exceed western boundary 
+    else if (position->x >= M) position->x --;  // position x tried to exceed eastern boundary
 }
 
 Wall* initialiseMapData(int walkLength, int* numberOfWalls)
@@ -119,16 +126,12 @@ Wall* initialiseMapData(int walkLength, int* numberOfWalls)
     // If the position is valid (the position is not out of bonds for the grid), set this new position as the current position
     // Go back to 4 and iterate until the completion condition is fulfilled (for example number of iterations)
 
-
-    #define N 30
-    #define M 30
-
-    Vector2Int startPos = {(N/2), (M/2)};  // starting in the middle of the map right? 
+    Vector2Int startPos = {(N/2), (M/2)};  // Starting in the middle of the map 
 
     // Initialise map
     int map[N][M] = { 0 };
 
-    // Generate walls 
+    // Generate walls randomly
     for (int i = 0; i < walkLength; i++) 
     {
         map[startPos.y][startPos.x] = 1;
@@ -140,7 +143,7 @@ Wall* initialiseMapData(int walkLength, int* numberOfWalls)
     // Evaluating characteristics of the array so that we can inform malloc
     for (int row = 0; row < N; row++) {
         for (int column = 0; column < M; column++) {
-            if (map[row][column] > 0) sumOfWalls ++;
+            if (map[row][column] == 0) sumOfWalls ++;
         }
     }
 
@@ -157,10 +160,10 @@ Wall* initialiseMapData(int walkLength, int* numberOfWalls)
     for (int i = 0; i < N; i++) {
         for (int j = 0; j < M; j++) 
         {
-            if (map[i][j] > 0)
+            if (map[i][j] == 0)
             {
-                int ID = map[i][j];
-                walls[index] = InitialiseWall(ID);
+                Wall wall = { 0 };  // Make a wall 
+                walls[index] = wall;  // Put it into the dynamic array 
                 walls[index].position.x = axisX;
                 walls[index].position.y = 0.25;
                 walls[index].position.z = axisZ;
@@ -169,7 +172,7 @@ Wall* initialiseMapData(int walkLength, int* numberOfWalls)
             }
             axisX++;
         }
-        axisX = ((M * -1) / 2) + 0.5;
+        axisX = ((M * -1) / 2);
         axisZ++;
     }
 
@@ -302,3 +305,4 @@ void freeQuadtree(QuadtreeNode* node) {
 // ------------------------------------
 
 #endif
+
